@@ -1,0 +1,72 @@
+import pygad
+import numpy as np
+import re
+from sklearn import svm
+from sklearn.metrics import f1_score
+
+
+
+# Define the training data
+X = np.random.randint(2, size=(100, 128))
+X = [ ['0', '1'] +[str(x) for x in seq] for seq in X]
+y = np.random.randint(2, size=250)
+X = np.reshape(X, (len(X), -1))
+
+# Define the SVM classifier
+clf = svm.SVC(kernel='linear')
+
+# Define the LCS
+class LCS:
+    def __init__(self, clf):
+        self.clf = clf
+        
+    def fit(self, X, y):
+        self.clf.fit(X, y)
+        
+    def predict(self, X):
+        return self.clf.predict(X)
+    
+    def score(self, X, y_true):
+        y_pred = self.clf.predict(X)
+        return f1_score(y_true, y_pred)
+
+# Define the fitness function
+def fitness_func(solution, solution_idx):
+    clf = svm.SVC(kernel='linear')
+    lcs = LCS(clf)
+    lcs.fit(X[:, solution].tolist(), y.tolist())  # Convert to list to avoid inhomogeneous shape error
+    return lcs.score(X[:, solution].tolist(), y.tolist())
+
+# Create the GA instance and run the optimization
+num_genes = 32
+sol_per_pop = 10
+num_generations = 50
+gene_type = int
+gene_space = {"low": 0, "high": 1}
+ga_instance = pygad.GA(num_generations=num_generations, 
+                       num_parents_mating=4, 
+                       sol_per_pop=sol_per_pop, 
+                       num_genes=num_genes, 
+                       gene_type=gene_type,
+                       gene_space=gene_space,
+                       fitness_func=fitness_func)
+
+ga_instance.run()
+
+# Get the best solution and train the LCS with it
+solution= ga_instance.best_solution()
+clf = svm.SVC(kernel='linear')
+lcs = LCS(clf)
+lcs.fit(X, y)
+
+# Output the learned regular expression pattern
+regex_pattern = ""
+for i in range(3):
+    if solution[i].any():
+        regex_pattern += f"{i},"
+regex_pattern = f"^(0|1){{{regex_pattern[:-1]}}}$"
+print("Learned pattern: ", regex_pattern)
+
+# Evaluate the LCS using F1 score
+f1 = lcs.score(X, y)
+print("F1 score: ", f1)
